@@ -6,7 +6,7 @@ from app.database.db import Base, engine
 from app.models.user import User
 from app.models.campus_signal import CampusSignal
 
-from app.routes import auth
+from app.routes import auth, signals
 
 
 Base.metadata.create_all(bind=engine)
@@ -39,3 +39,4 @@ def db_health_check():
 
 
 app.include_router(auth.router)
+app.include_router(signals.router)
