@@ -15,7 +15,7 @@ def analyze_signal(
     location_signal_count: int = 0
 ):
 
-    category, department = classify_signal(description)
+    classification = classify_signal(description)
 
     sentiment = analyze_sentiment(description)
 
@@ -42,11 +42,11 @@ def analyze_signal(
     )
 
     return {
-        "ai_category": category,
+        "ai_category": classification['category'],
         "ai_sentiment": sentiment,
         "ai_priority": priority,
         "ai_summary": summary,
-        "suggested_department": department,
+        "suggested_department": classification['department'],
         "duplicate_score": duplicate_score,
         "hotspot_score": hotspot_score
     }
