@@ -1,21 +1,40 @@
-# Python
-venv/
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-*.pyd
+
+# Virtual environment
+venv/
+.env/
+.venv/
+
+# Environment variables
 .env
-*.db
+.env.local
 
 # VS Code
 .vscode/
 
-# OS Files
-.DS_Store
-Thumbs.db
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
 
-# Future frontend
-node_modules/
-dist/
-build/
-.expo/
+# Logs
+*.log
+
+# Test files in backend root
+backend/test_*.py
+test_*.py
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage files
+.coverage
+htmlcov/
+
+# AI model/cache folders
+.cache/
+models/
+sentence_transformers/
