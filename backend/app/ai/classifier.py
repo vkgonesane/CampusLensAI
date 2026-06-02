@@ -169,7 +169,7 @@ class CampusSignalClassifier:
         confidence = scores[best_category]
 
         # Safety fallback for unclear complaints
-        if confidence < 0.30:
+        if confidence < 0.35:
             best_category = "general"
 
         return {

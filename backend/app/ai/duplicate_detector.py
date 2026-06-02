@@ -69,7 +69,7 @@ class DuplicateDetector:
             old_text = signal.get("text", "")
             old_category = signal.get("category", "")
             old_location = signal.get("location", "")
-            old_status = signal.get("status", "open")
+            old_status = str(signal.get("status", "open") or "open")
 
             if not old_text:
                 continue

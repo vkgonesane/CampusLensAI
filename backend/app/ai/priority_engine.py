@@ -69,21 +69,21 @@ class PriorityEngine:
             score += 1
             reasons.append("Frustration or repeated complaint language increased priority.")
 
-        if duplicate_score >= 0.75:
+        if duplicate_score >= 0.85:
             score += 2
-            reasons.append("High duplicate score indicates repeated reports.")
+            reasons.append("Very high duplicate score indicates repeated reports.")
 
-        elif duplicate_score >= 0.50:
+        elif duplicate_score >= 0.65:
             score += 1
             reasons.append("Moderate duplicate score indicates possible repeated issue.")
 
-        if hotspot_score >= 0.75:
+        if hotspot_score >= 0.85:
             score += 2
-            reasons.append("High hotspot score indicates location-level issue cluster.")
+            reasons.append("Strong hotspot detected at this location.")
 
-        elif hotspot_score >= 0.50:
+        elif hotspot_score >= 0.60:
             score += 1
-            reasons.append("Moderate hotspot score increased priority.")
+            reasons.append("Possible hotspot detected at this location.")
 
         if reopen_count > 0:
             reopen_boost = min(reopen_count * 2, 4)
@@ -108,9 +108,9 @@ class PriorityEngine:
         Convert numeric score into readable priority label.
         """
 
-        if score >= 10:
+        if score >= 12:
             return "critical"
-        elif score >= 7:
+        elif score >= 8:
             return "high"
         elif score >= 4:
             return "medium"

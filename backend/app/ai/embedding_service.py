@@ -48,7 +48,12 @@ class EmbeddingService:
         if not text or not text.strip():
             raise ValueError("Text cannot be empty for embedding generation.")
 
-        return self.model.encode(text)
+        prepared_text = f"Campus complaint: {text.strip()}"
+
+        return self.model.encode(
+            prepared_text,
+            normalize_embeddings=True
+        )
 
     def get_embeddings(self, texts: List[str]) -> np.ndarray:
         """
@@ -73,7 +78,15 @@ class EmbeddingService:
         if not cleaned_texts:
             raise ValueError("Text list contains no valid text.")
 
-        return self.model.encode(cleaned_texts)
+        prepared_texts = [
+            f"Campus complaint: {text}"
+            for text in cleaned_texts
+        ]
+
+        return self.model.encode(
+            prepared_texts,
+            normalize_embeddings=True
+        )
 
     def calculate_similarity(self, text1: str, text2: str) -> float:
         """

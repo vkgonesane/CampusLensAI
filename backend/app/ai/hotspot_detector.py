@@ -74,7 +74,7 @@ class HotspotDetector:
         for signal in recent_signals:
             old_location = signal.get("location")
             old_category = signal.get("category")
-            old_status = signal.get("status", "open")
+            old_status = str(signal.get("status", "open") or "open")
             old_id = signal.get("id")
 
             if not old_location:
@@ -91,7 +91,7 @@ class HotspotDetector:
             same_location_count += 1
             related_signal_ids.append(old_id)
 
-            if old_category == new_category:
+            if str(old_category).lower() == str(new_category).lower():
                 same_category_count += 1
 
             if old_status.lower() not in ["resolved", "closed", "rejected"]:
