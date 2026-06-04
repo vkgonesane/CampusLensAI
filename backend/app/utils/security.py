@@ -1,13 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-
-SECRET_KEY = "campuslensai_dev_secret_key_change_later"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+from app.core.config import settings
 
 
 pwd_context = CryptContext(
@@ -24,35 +21,34 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: dict,
+    expires_delta: Optional[timedelta] = None
+) -> str:
     to_encode = data.copy()
 
-    expire = datetime.utcnow() + (
+    expire = datetime.now(timezone.utc) + (
         expires_delta
         if expires_delta
-        else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        else timedelta(minutes=settings.access_token_expire_minutes)
     )
 
     to_encode.update({"exp": expire})
 
-    token = jwt.encode(
+    return jwt.encode(
         to_encode,
-        SECRET_KEY,
-        algorithm=ALGORITHM
+        settings.secret_key,
+        algorithm=settings.jwt_algorithm
     )
-
-    return token
 
 
 def decode_access_token(token: str):
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
+            settings.secret_key,
+            algorithms=[settings.jwt_algorithm]
         )
-
-        return payload
 
     except JWTError:
         return None

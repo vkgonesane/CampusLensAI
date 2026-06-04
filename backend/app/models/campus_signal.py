@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.sql import func
 
 from app.database.db import Base
@@ -41,6 +41,10 @@ class CampusSignal(Base):
     ai_summary = Column(Text, nullable=True)
     duplicate_score = Column(Float, nullable=False, default=0.0)
     hotspot_score = Column(Float, nullable=False, default=0.0)
+
+    sla_due_at = Column(DateTime(timezone=True), nullable=True)
+    sla_breached = Column(Boolean, nullable=False, default=False)
+    escalated_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
