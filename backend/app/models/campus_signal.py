@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey
 from sqlalchemy.sql import func
 
 from app.database.db import Base
@@ -19,13 +19,10 @@ class CampusSignal(Base):
     longitude = Column(Float, nullable=True)
 
     status = Column(String(50), nullable=False, default="submitted")
-    # submitted, under_review, assigned, in_progress,
-    # fixed_by_staff, supervisor_review, closed, reopened, rework_required
-
     priority = Column(String(50), nullable=False, default="medium")
-    # low, medium, high, urgent
 
     department = Column(String(100), nullable=True)
+    suggested_department = Column(String(100), nullable=True)
 
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
@@ -44,10 +41,6 @@ class CampusSignal(Base):
     ai_summary = Column(Text, nullable=True)
     duplicate_score = Column(Float, nullable=False, default=0.0)
     hotspot_score = Column(Float, nullable=False, default=0.0)
-
-    sla_due_at = Column(DateTime(timezone=True), nullable=True)
-    sla_breached = Column(Boolean, nullable=False, default=False)
-    escalated_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

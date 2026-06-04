@@ -1,11 +1,9 @@
 from sqlalchemy.orm import Session
 
-from app.models.campus_signal import CampusSignal
 from app.models.signal_comment import SignalComment
 from app.models.user import User
 from app.schemas.signal_schema import SignalCommentCreate
 from app.services.activity_service import create_activity
-from app.services.notification_service import notify_comment_added
 
 
 def create_signal_comment(
@@ -14,12 +12,6 @@ def create_signal_comment(
     db: Session,
     current_user: User
 ):
-    signal = (
-        db.query(CampusSignal)
-        .filter(CampusSignal.id == signal_id)
-        .first()
-    )
-
     comment = SignalComment(
         signal_id=signal_id,
         author_id=current_user.id,
@@ -39,14 +31,6 @@ def create_signal_comment(
             "comment_id": comment.id
         }
     )
-
-    if signal and signal.created_by != current_user.id:
-        notify_comment_added(
-            db=db,
-            user_id=signal.created_by,
-            signal_title=signal.title,
-            commenter_name=current_user.full_name
-        )
 
     db.commit()
     db.refresh(comment)

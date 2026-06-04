@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from app.ai.ai_service import analyze_signal
 from app.ai.duplicate_detector import find_best_duplicate_match
 from app.models.campus_signal import CampusSignal
-from app.models.signal_activity import SignalActivity
 from app.models.user import User
 from app.schemas.signal_schema import (
     CampusSignalCreate,
@@ -17,91 +16,17 @@ from app.schemas.signal_schema import (
     SignalMarkFixedRequest,
     SignalReviewRequest,
     SignalStartWorkRequest,
-    SignalSupervisorReviewRequest,
+    SignalSupervisorReviewRequest
 )
 from app.services.activity_service import create_activity
-from app.services.notification_service import (
-    notify_signal_assigned,
-    notify_signal_closed,
-    notify_signal_reopened,
-)
 from app.services.workflow_service import validate_status_transition
 
 
-def calculate_sla_due_at(priority: str) -> datetime:
-    now = datetime.now(timezone.utc)
-
-    sla_hours = {
-        "urgent": 4,
-        "critical": 4,
-        "high": 24,
-        "medium": 72,
-        "low": 168,
-    }
-
-    normalized_priority = (priority or "medium").lower()
-    hours = sla_hours.get(normalized_priority, 72)
-
-    return now + timedelta(hours=hours)
-
-
-def check_and_mark_sla_breached(
-    signal: CampusSignal,
+def create_signal(
+    signal_data: CampusSignalCreate,
     db: Session,
-    actor_id: int,
-) -> bool:
-    if signal.sla_breached:
-        return False
-
-    if signal.status == "closed":
-        return False
-
-    if signal.sla_due_at is None:
-        return False
-
-    now = datetime.now(timezone.utc)
-    sla_due_at = signal.sla_due_at
-
-    if sla_due_at.tzinfo is None:
-        sla_due_at = sla_due_at.replace(tzinfo=timezone.utc)
-
-    if now <= sla_due_at:
-        return False
-
-    existing_activity = (
-        db.query(SignalActivity)
-        .filter(SignalActivity.signal_id == signal.id)
-        .filter(SignalActivity.action == "sla_breached")
-        .first()
-    )
-
-    if existing_activity:
-        signal.sla_breached = True
-        return True
-
-    signal.sla_breached = True
-
-    create_activity(
-        db=db,
-        signal_id=signal.id,
-        actor_id=actor_id,
-        action="sla_breached",
-        from_status=signal.status,
-        to_status=signal.status,
-        note="SLA deadline breached",
-        metadata={
-            "priority": signal.priority,
-            "sla_due_at": signal.sla_due_at.isoformat()
-            if signal.sla_due_at
-            else None,
-            "checked_at": now.isoformat(),
-        },
-    )
-
-    return True
-
-
-def create_signal(signal_data: CampusSignalCreate, db: Session, current_user: User):
+    current_user: User
+):
     ten_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=10)
 
     recent_same_user_signals = (
@@ -114,7 +39,7 @@ def create_signal(signal_data: CampusSignalCreate, db: Session, current_user: Us
 
     duplicate_match = find_best_duplicate_match(
         current_description=signal_data.description,
-        previous_signals=recent_same_user_signals,
+        previous_signals=recent_same_user_signals
     )
 
     if duplicate_match["score"] >= 0.85 and duplicate_match["matched_signal"]:
@@ -124,6 +49,7 @@ def create_signal(signal_data: CampusSignalCreate, db: Session, current_user: Us
     previous_descriptions = [row[0] for row in previous_signal_rows]
 
     location_signal_count = 0
+
     if signal_data.location_name:
         location_signal_count = (
             db.query(CampusSignal)
@@ -137,10 +63,8 @@ def create_signal(signal_data: CampusSignalCreate, db: Session, current_user: Us
         location_name=signal_data.location_name,
         reopen_count=0,
         previous_descriptions=previous_descriptions,
-        location_signal_count=location_signal_count,
+        location_signal_count=location_signal_count
     )
-
-    sla_due_at = calculate_sla_due_at(ai_result["ai_priority"])
 
     new_signal = CampusSignal(
         title=signal_data.title,
@@ -159,10 +83,7 @@ def create_signal(signal_data: CampusSignalCreate, db: Session, current_user: Us
         ai_priority=ai_result["ai_priority"],
         ai_summary=ai_result["ai_summary"],
         duplicate_score=ai_result["duplicate_score"],
-        hotspot_score=ai_result["hotspot_score"],
-        sla_due_at=sla_due_at,
-        sla_breached=False,
-        escalated_at=None,
+        hotspot_score=ai_result["hotspot_score"]
     )
 
     db.add(new_signal)
@@ -180,11 +101,8 @@ def create_signal(signal_data: CampusSignalCreate, db: Session, current_user: Us
             "title": new_signal.title,
             "location_name": new_signal.location_name,
             "priority": new_signal.priority,
-            "sla_due_at": new_signal.sla_due_at.isoformat()
-            if new_signal.sla_due_at
-            else None,
-            "ai_category": new_signal.ai_category,
-        },
+            "ai_category": new_signal.ai_category
+        }
     )
 
     db.commit()
@@ -200,7 +118,7 @@ def get_all_signals(
     per_page: int = 10,
     status_filter: str | None = None,
     priority_filter: str | None = None,
-    department_filter: str | None = None,
+    department_filter: str | None = None
 ):
     if page < 1:
         page = 1
@@ -228,66 +146,58 @@ def get_all_signals(
     total = query.count()
 
     results = (
-        query.order_by(CampusSignal.id.desc())
+        query
+        .order_by(CampusSignal.id.desc())
         .offset((page - 1) * per_page)
         .limit(per_page)
         .all()
     )
 
-    changed = False
-
-    for signal in results:
-        breached_now = check_and_mark_sla_breached(
-            signal=signal,
-            db=db,
-            actor_id=current_user.id,
-        )
-        if breached_now:
-            changed = True
-
-    if changed:
-        db.commit()
-
-        for signal in results:
-            db.refresh(signal)
-
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
-        "results": results,
+        "results": results
     }
 
 
-def get_signal_by_id(signal_id: int, db: Session, current_user: User):
-    signal = _get_signal_or_404(signal_id, db)
+def get_signal_by_id(
+    signal_id: int,
+    db: Session,
+    current_user: User
+):
+    signal = (
+        db.query(CampusSignal)
+        .filter(CampusSignal.id == signal_id)
+        .first()
+    )
+
+    if not signal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campus Signal not found"
+        )
 
     if current_user.role == "user" and signal.created_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only view your own Campus Signals",
+            detail="You can only view your own Campus Signals"
         )
-
-    breached_now = check_and_mark_sla_breached(
-        signal=signal,
-        db=db,
-        actor_id=current_user.id,
-    )
-
-    if breached_now:
-        db.commit()
-        db.refresh(signal)
 
     return signal
 
 
 def _get_signal_or_404(signal_id: int, db: Session):
-    signal = db.query(CampusSignal).filter(CampusSignal.id == signal_id).first()
+    signal = (
+        db.query(CampusSignal)
+        .filter(CampusSignal.id == signal_id)
+        .first()
+    )
 
     if not signal:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Campus Signal not found",
+            detail="Campus Signal not found"
         )
 
     return signal
@@ -300,13 +210,13 @@ def _change_status(
     current_user: User,
     action: str,
     note: str | None = None,
-    metadata: dict | None = None,
+    metadata: dict | None = None
 ):
     current_status = signal.status
 
     validate_status_transition(
         current_status=current_status,
-        requested_status=requested_status,
+        requested_status=requested_status
     )
 
     signal.status = requested_status
@@ -322,7 +232,7 @@ def _change_status(
         from_status=current_status,
         to_status=requested_status,
         note=note,
-        metadata=metadata,
+        metadata=metadata
     )
 
 
@@ -330,7 +240,7 @@ def review_signal(
     signal_id: int,
     review_data: SignalReviewRequest,
     db: Session,
-    current_user: User,
+    current_user: User
 ):
     signal = _get_signal_or_404(signal_id, db)
 
@@ -340,7 +250,7 @@ def review_signal(
         db=db,
         current_user=current_user,
         action="signal_review_started",
-        note=review_data.note,
+        note=review_data.note
     )
 
     db.commit()
@@ -353,7 +263,7 @@ def assign_signal(
     signal_id: int,
     assign_data: SignalAssignRequest,
     db: Session,
-    current_user: User,
+    current_user: User
 ):
     signal = _get_signal_or_404(signal_id, db)
 
@@ -373,14 +283,8 @@ def assign_signal(
         metadata={
             "department": assign_data.department,
             "assigned_staff_id": assign_data.assigned_staff_id,
-            "supervisor_id": assign_data.supervisor_id,
-        },
-    )
-
-    notify_signal_assigned(
-        db=db,
-        user_id=signal.assigned_staff_id,
-        signal_title=signal.title,
+            "supervisor_id": assign_data.supervisor_id
+        }
     )
 
     db.commit()
@@ -393,7 +297,7 @@ def start_work(
     signal_id: int,
     start_data: SignalStartWorkRequest,
     db: Session,
-    current_user: User,
+    current_user: User
 ):
     signal = _get_signal_or_404(signal_id, db)
 
@@ -403,7 +307,7 @@ def start_work(
         db=db,
         current_user=current_user,
         action="work_started",
-        note=start_data.note,
+        note=start_data.note
     )
 
     db.commit()
@@ -416,7 +320,7 @@ def mark_fixed(
     signal_id: int,
     fixed_data: SignalMarkFixedRequest,
     db: Session,
-    current_user: User,
+    current_user: User
 ):
     signal = _get_signal_or_404(signal_id, db)
 
@@ -428,7 +332,7 @@ def mark_fixed(
         db=db,
         current_user=current_user,
         action="fixed_by_staff",
-        note=fixed_data.resolution_note,
+        note=fixed_data.resolution_note
     )
 
     db.commit()
@@ -441,7 +345,7 @@ def send_to_supervisor_review(
     signal_id: int,
     review_data: SignalSupervisorReviewRequest,
     db: Session,
-    current_user: User,
+    current_user: User
 ):
     signal = _get_signal_or_404(signal_id, db)
 
@@ -454,7 +358,7 @@ def send_to_supervisor_review(
         db=db,
         current_user=current_user,
         action="sent_to_supervisor_review",
-        note=review_data.supervisor_note,
+        note=review_data.supervisor_note
     )
 
     db.commit()
@@ -467,7 +371,7 @@ def close_signal(
     signal_id: int,
     close_data: SignalCloseRequest,
     db: Session,
-    current_user: User,
+    current_user: User
 ):
     signal = _get_signal_or_404(signal_id, db)
 
@@ -479,13 +383,7 @@ def close_signal(
         db=db,
         current_user=current_user,
         action="closed",
-        note=close_data.supervisor_note,
-    )
-
-    notify_signal_closed(
-        db=db,
-        user_id=signal.created_by,
-        signal_title=signal.title,
+        note=close_data.supervisor_note
     )
 
     db.commit()
@@ -498,7 +396,7 @@ def update_signal_status(
     signal_id: int,
     update_data: CampusSignalStatusUpdate,
     db: Session,
-    current_user: User,
+    current_user: User
 ):
     signal = _get_signal_or_404(signal_id, db)
 
@@ -507,7 +405,7 @@ def update_signal_status(
 
     validate_status_transition(
         current_status=current_status,
-        requested_status=requested_status,
+        requested_status=requested_status
     )
 
     signal.status = requested_status
@@ -541,8 +439,8 @@ def update_signal_status(
         metadata={
             "department": update_data.department,
             "assigned_staff_id": update_data.assigned_staff_id,
-            "supervisor_id": update_data.supervisor_id,
-        },
+            "supervisor_id": update_data.supervisor_id
+        }
     )
 
     db.commit()
@@ -555,20 +453,20 @@ def reopen_signal(
     signal_id: int,
     reopen_data: CampusSignalReopenRequest,
     db: Session,
-    current_user: User,
+    current_user: User
 ):
     signal = _get_signal_or_404(signal_id, db)
 
     if signal.created_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the original reporter can reopen this Campus Signal",
+            detail="Only the original reporter can reopen this Campus Signal"
         )
 
     if signal.status != "closed":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only closed signals can be reopened",
+            detail="Only closed signals can be reopened"
         )
 
     previous_status = signal.status
@@ -595,7 +493,7 @@ def reopen_signal(
         location_name=signal.location_name,
         reopen_count=signal.reopen_count,
         previous_descriptions=previous_descriptions,
-        location_signal_count=location_signal_count,
+        location_signal_count=location_signal_count
     )
 
     signal.priority = ai_result["ai_priority"]
@@ -607,9 +505,6 @@ def reopen_signal(
     signal.ai_summary = ai_result["ai_summary"]
     signal.duplicate_score = ai_result["duplicate_score"]
     signal.hotspot_score = ai_result["hotspot_score"]
-    signal.sla_due_at = calculate_sla_due_at(ai_result["ai_priority"])
-    signal.sla_breached = False
-    signal.escalated_at = None
 
     create_activity(
         db=db,
@@ -622,19 +517,9 @@ def reopen_signal(
         metadata={
             "reopen_count": signal.reopen_count,
             "priority": signal.priority,
-            "sla_due_at": signal.sla_due_at.isoformat()
-            if signal.sla_due_at
-            else None,
-            "hotspot_score": signal.hotspot_score,
-        },
+            "hotspot_score": signal.hotspot_score
+        }
     )
-
-    if signal.supervisor_id:
-        notify_signal_reopened(
-            db=db,
-            user_id=signal.supervisor_id,
-            signal_title=signal.title,
-        )
 
     db.commit()
     db.refresh(signal)

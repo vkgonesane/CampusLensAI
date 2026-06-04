@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.database.db import get_db
-from app.schemas.auth_schema import UserRegister, UserLogin, TokenResponse
+from app.models.user import User
+from app.schemas.auth_schema import UserRegister, UserLogin, TokenResponse, UserResponse
 from app.services.auth_service import register_user, login_user
+from app.utils.auth_dependencies import get_current_user
 
 
 router = APIRouter(
@@ -34,3 +37,20 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
         password=login_data.password,
         db=db
     )
+
+
+@router.post("/swagger-login", response_model=TokenResponse)
+def swagger_login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    return login_user(
+        email=form_data.username,
+        password=form_data.password,
+        db=db
+    )
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user

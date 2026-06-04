@@ -9,9 +9,6 @@ from app.models.campus_signal import CampusSignal
 from app.models.signal_attachment import SignalAttachment
 from app.models.user import User
 from app.services.activity_service import create_activity
-from app.services.notification_service import (
-    notify_attachment_uploaded
-)
 
 
 ALLOWED_CONTENT_TYPES = [
@@ -98,14 +95,6 @@ def upload_signal_attachment(
             "file_size_bytes": file_size
         }
     )
-
-    if signal.created_by != current_user.id:
-        notify_attachment_uploaded(
-            db=db,
-            user_id=signal.created_by,
-            signal_title=signal.title,
-            uploader_name=current_user.full_name
-        )
 
     db.commit()
     db.refresh(attachment)
