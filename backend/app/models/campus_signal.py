@@ -19,13 +19,10 @@ class CampusSignal(Base):
     longitude = Column(Float, nullable=True)
 
     status = Column(String(50), nullable=False, default="submitted")
-    # submitted, under_review, assigned, in_progress,
-    # fixed_by_staff, supervisor_review, closed, reopened, rework_required
-
     priority = Column(String(50), nullable=False, default="medium")
-    # low, medium, high, urgent
 
     department = Column(String(100), nullable=True)
+    suggested_department = Column(String(100), nullable=True)
 
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 

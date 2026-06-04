@@ -1,4 +1,4 @@
-from app.ai.classifier import classify_signal
+from app.ai.classifier_fallback import classify_signal
 from app.ai.sentiment import analyze_sentiment
 from app.ai.priority_engine import calculate_priority
 from app.ai.summarizer import generate_summary
