@@ -1,21 +1,29 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.database.db import Base, engine
+from app.core.error_handlers import app_exception_handler
+from app.core.exceptions import AppException
+from app.database.db import engine
 
-from app.models.user import User
-from app.models.campus_signal import CampusSignal
-
-from app.routes import auth
-
-
-Base.metadata.create_all(bind=engine)
+from app.routes import analytics, auth, notifications, signals, users
 
 
 app = FastAPI(
     title="CampusLensAI Backend",
     description="AI-powered campus intelligence platform",
     version="1.0.0"
+)
+
+app.add_exception_handler(
+    AppException,
+    app_exception_handler
+)
+
+app.mount(
+    "/uploads",
+    StaticFiles(directory="uploads"),
+    name="uploads"
 )
 
 
@@ -39,3 +47,7 @@ def db_health_check():
 
 
 app.include_router(auth.router)
+app.include_router(signals.router)
+app.include_router(analytics.router)
+app.include_router(notifications.router)
+app.include_router(users.router)
