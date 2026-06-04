@@ -9,3 +9,12 @@ python-multipart
 psycopg2-binary
 python-dotenv
 bcrypt==4.0.1
+
+# AI dependencies
+numpy
+scikit-learn
+torch
+transformers
+sentence-transformers
+vaderSentiment
+spacy

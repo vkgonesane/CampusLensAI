@@ -2,10 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.core.error_handlers import app_exception_handler
-from app.core.exceptions import AppException
 from app.database.db import engine
-
 from app.routes import analytics, auth, notifications, signals, users
 
 
@@ -13,11 +10,6 @@ app = FastAPI(
     title="CampusLensAI Backend",
     description="AI-powered campus intelligence platform",
     version="1.0.0"
-)
-
-app.add_exception_handler(
-    AppException,
-    app_exception_handler
 )
 
 app.mount(

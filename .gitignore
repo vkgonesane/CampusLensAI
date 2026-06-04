@@ -1,12 +1,20 @@
 # Python
 backend/venv/
 venv/
+.venv/
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+
+# Environment variables
 .env
+.env.local
+
+# Database files
 *.db
+*.sqlite
+*.sqlite3
 
 # VS Code
 .vscode/
@@ -15,9 +23,27 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Future frontend
+# Frontend / Node / Expo
 node_modules/
 dist/
 build/
 .expo/
-.env.local
+
+# Logs
+*.log
+
+# Test files
+backend/test_*.py
+test_*.py
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage files
+.coverage
+htmlcov/
+
+# AI model/cache folders
+.cache/
+models/
+sentence_transformers/
