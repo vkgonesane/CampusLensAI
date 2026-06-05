@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CampusSignalCreate(BaseModel):
@@ -54,6 +54,8 @@ class CampusSignalReopenRequest(BaseModel):
 
 
 class CampusSignalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     title: str
     description: str
@@ -88,9 +90,6 @@ class CampusSignalResponse(BaseModel):
     sla_breached: bool
     escalated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
-
 
 class PaginatedSignalsResponse(BaseModel):
     total: int
@@ -100,6 +99,8 @@ class PaginatedSignalsResponse(BaseModel):
 
 
 class SignalActivityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     signal_id: int
     actor_id: int
@@ -110,11 +111,10 @@ class SignalActivityResponse(BaseModel):
     metadata_json: Optional[dict[str, Any]]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class SignalAttachmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     signal_id: int
     uploaded_by: int
@@ -125,20 +125,16 @@ class SignalAttachmentResponse(BaseModel):
     file_size_bytes: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class SignalCommentCreate(BaseModel):
     comment: str
 
 
 class SignalCommentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     signal_id: int
     author_id: int
     comment: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
