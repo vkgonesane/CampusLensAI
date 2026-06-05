@@ -291,6 +291,22 @@ def _get_signal_or_404(signal_id: int, db: Session):
 
     return signal
 
+def _ensure_assigned_staff_or_admin(signal: CampusSignal, current_user: User):
+    if current_user.role == "admin":
+        return
+
+    if current_user.role != "department_staff":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only assigned department staff or admins can perform this action",
+        )
+
+    if signal.assigned_staff_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This signal is not assigned to you",
+        )
+
 
 def _change_status(
     signal: CampusSignal,
@@ -356,6 +372,43 @@ def assign_signal(
 ):
     signal = _get_signal_or_404(signal_id, db)
 
+    assigned_staff = (
+        db.query(User)
+        .filter(User.id == assign_data.assigned_staff_id)
+        .first()
+    )
+
+    if not assigned_staff:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assigned staff user does not exist",
+        )
+
+    if assigned_staff.role != "department_staff":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assigned user must have role department_staff",
+        )
+
+    if assign_data.supervisor_id is not None:
+        supervisor = (
+            db.query(User)
+            .filter(User.id == assign_data.supervisor_id)
+            .first()
+        )
+
+        if not supervisor:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Supervisor user does not exist",
+            )
+
+        if supervisor.role != "supervisor":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Supervisor user must have role supervisor",
+            )
+
     signal.department = assign_data.department
     signal.assigned_staff_id = assign_data.assigned_staff_id
 
@@ -396,6 +449,8 @@ def start_work(
 ):
     signal = _get_signal_or_404(signal_id, db)
 
+    _ensure_assigned_staff_or_admin(signal, current_user)
+
     _change_status(
         signal=signal,
         requested_status="in_progress",
@@ -419,6 +474,8 @@ def mark_fixed(
 ):
     signal = _get_signal_or_404(signal_id, db)
 
+    _ensure_assigned_staff_or_admin(signal, current_user)
+
     signal.resolution_note = fixed_data.resolution_note
 
     _change_status(
@@ -426,7 +483,7 @@ def mark_fixed(
         requested_status="fixed_by_staff",
         db=db,
         current_user=current_user,
-        action="fixed_by_staff",
+        action="marked_fixed",
         note=fixed_data.resolution_note,
     )
 
@@ -444,7 +501,9 @@ def send_to_supervisor_review(
 ):
     signal = _get_signal_or_404(signal_id, db)
 
-    if review_data.supervisor_note is not None:
+    _ensure_assigned_staff_or_admin(signal, current_user)
+
+    if review_data.supervisor_note:
         signal.supervisor_note = review_data.supervisor_note
 
     _change_status(
@@ -452,9 +511,16 @@ def send_to_supervisor_review(
         requested_status="supervisor_review",
         db=db,
         current_user=current_user,
-        action="sent_to_supervisor_review",
+        action="sent_to_supervisor",
         note=review_data.supervisor_note,
     )
+
+    if signal.supervisor_id:
+        notify_signal_ready_for_review(
+            db=db,
+            user_id=signal.supervisor_id,
+            signal_title=signal.title,
+        )
 
     db.commit()
     db.refresh(signal)
@@ -469,6 +535,18 @@ def close_signal(
     current_user: User,
 ):
     signal = _get_signal_or_404(signal_id, db)
+
+    if current_user.role not in ["admin", "supervisor"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins or supervisors can close signals",
+        )
+
+    if signal.status != "supervisor_review":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Signal must be in supervisor_review before closure",
+        )
 
     signal.supervisor_note = close_data.supervisor_note
 
