@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from signal import signal
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -24,6 +25,8 @@ from app.services.notification_service import (
     notify_signal_assigned,
     notify_signal_closed,
     notify_signal_reopened,
+    notify_signal_ready_for_review,
+    notify_sla_breached,
 )
 from app.services.workflow_service import validate_status_transition
 
@@ -76,6 +79,16 @@ def check_and_mark_sla_breached(
     )
 
     signal.sla_breached = True
+
+    if signal.escalated_at is None:
+        signal.escalated_at = now
+
+        if signal.supervisor_id:
+            notify_sla_breached(
+                db=db,
+                user_id=signal.supervisor_id,
+                signal_title=signal.title,
+            )
 
     if existing_activity:
         return True

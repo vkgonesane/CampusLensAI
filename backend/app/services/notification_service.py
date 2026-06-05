@@ -60,6 +60,32 @@ def notify_signal_reopened(
     )
 
 
+def notify_signal_ready_for_review(
+    db: Session,
+    user_id: int,
+    signal_title: str
+):
+    return create_notification(
+        db=db,
+        user_id=user_id,
+        title="Signal Ready for Supervisor Review",
+        message=f"Signal '{signal_title}' is ready for supervisor review."
+    )
+
+
+def notify_sla_breached(
+    db: Session,
+    user_id: int,
+    signal_title: str
+):
+    return create_notification(
+        db=db,
+        user_id=user_id,
+        title="SLA Breached",
+        message=f"Signal '{signal_title}' has breached its SLA deadline and requires escalation."
+    )
+
+
 def notify_comment_added(
     db: Session,
     user_id: int,
